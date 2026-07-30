@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>창문형 에어컨 설치 가능 진단</title>
+<style>
+  :root{
+    --bg:#0e1320; --card:#18202f; --card2:#131a27; --line:#28324a; --text:#e8edf6;
+    --muted:#93a0b8; --accent:#4f8cff; --ok:#2ec07a; --warn:#f0b429; --no:#ff5c6c;
+    --naver:#03c75a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);line-height:1.6;
+    font-family:-apple-system,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    font-size:15px}
+  .wrap{max-width:780px;margin:0 auto;padding:26px 18px 70px}
+
+  /* ── 헤더 ── */
+  header{margin-bottom:20px}
+  h1{font-size:23px;margin:0 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:14px}
+
+  /* 한 컬럼 — 2단 배치는 오히려 답답해서 되돌렸다 */
+  .grid{display:block}
+
+  /* ── 카드 ── */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:18px;margin-bottom:15px}
+  .card h2{font-size:13px;margin:0 0 13px;color:var(--muted);font-weight:700;
+    letter-spacing:.04em}
+  label{display:block;font-size:13.5px;color:var(--muted);margin:0 0 6px}
+  select,input[type=number]{width:100%;padding:12px 13px;border-radius:9px;
+    border:1px solid var(--line);background:var(--card2);color:var(--text);font-size:15px;
+    font-family:inherit}
+  select:focus,input:focus{outline:2px solid rgba(79,140,255,.5);outline-offset:-1px}
+  .mt{margin-top:14px}
+  .note{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.55}
+  .row{display:flex;gap:12px}.row>div{flex:1}
+
+  /* 사진 업로드 */
+  .drop{border:2px dashed var(--line);border-radius:12px;padding:26px 16px;text-align:center;
+    cursor:pointer;transition:.15s;color:var(--muted);font-size:14px}
+  .drop:hover,.drop.drag{border-color:var(--accent);color:var(--text);background:var(--card2)}
+  .drop img{max-width:100%;max-height:280px;border-radius:9px;margin-top:10px}
+
+  /* 체크박스 */
+  .checks{display:grid;grid-template-columns:1fr 1fr;gap:11px 14px}
+  .checks label{display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;
+    margin:0;cursor:pointer}
+  .checks input{width:18px;height:18px;accent-color:var(--accent);flex:none}
+
+  /* 실행 버튼 */
+  button.go{width:100%;padding:16px;border:0;border-radius:11px;background:var(--accent);
+    color:#fff;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit}
+  button.go:disabled{opacity:.55;cursor:default}
+
+  /* details 공통 */
+  details>summary{cursor:pointer;font-size:13.5px;color:var(--accent);padding:7px 0;
+    font-weight:600;list-style:none}
+  details>summary::-webkit-details-marker{display:none}
+  details>summary::before{content:"▸ ";}
+  details[open]>summary::before{content:"▾ ";}
+
+  /* ── 사진 분석 패널 ── */
+  #visionBox{display:none;margin-top:15px;padding-top:15px;border-top:1px solid var(--line)}
+  #overlay{width:100%;border-radius:10px;border:1px solid var(--line)}
+  .legend{display:flex;gap:13px;flex-wrap:wrap;margin:9px 0 4px;font-size:12px;color:var(--muted)}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px}
+  ul.ev{margin:8px 0 0;padding-left:18px}
+  ul.ev li{font-size:13.5px;margin:6px 0;color:var(--muted)}
+  ul.ev li b{color:var(--text)}
+
+  /* ── 결과: 히어로 ── */
+  #result{display:none}
+  .hero{border-radius:14px;padding:20px;margin-bottom:15px}
+  .hero .top{display:flex;align-items:center;gap:15px}
+  .hero .ico{font-size:34px;line-height:1}
+  .hero .vt{font-size:25px;font-weight:800;letter-spacing:-.02em}
+  .hero .vs{color:var(--muted);font-size:13.5px;margin-top:3px}
+  .v-ok{background:rgba(46,192,122,.12);border:1px solid var(--ok)}
+  .v-tech{background:rgba(240,180,41,.12);border:1px solid var(--warn)}
+  .v-no{background:rgba(255,92,108,.12);border:1px solid var(--no)}
+  .v-info{background:rgba(147,160,184,.1);border:1px solid var(--muted)}
+  /* 분석은 됐고 한 단계 남은 상태 — 실패처럼 보이면 안 된다 */
+  .v-info2{background:rgba(79,140,255,.12);border:1px solid var(--accent)}
+  /* 사진에서 확인된 것 */
+  .found{background:var(--card2);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;margin-bottom:15px}
+  .found h3{margin-bottom:8px}
+  .found li{color:var(--muted)}
+  .found li b{color:var(--text)}
+
+  /* 크기 */
+  .sizebox{background:var(--card2);border:1px solid var(--accent);border-radius:12px;
+    padding:16px;margin-bottom:15px}
+  .sizehead{font-size:12.5px;color:var(--muted);margin-bottom:5px}
+  .sizeval{font-size:22px;font-weight:800;color:var(--accent);letter-spacing:-.02em}
+  .sizesrc{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .sizeask{font-size:13.5px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
+  button.lnk{background:none;border:0;color:var(--accent);font-size:13.5px;font-weight:700;
+    text-decoration:underline;cursor:pointer;font-family:inherit;padding:0}
+
+  /* 높이 선택 — 가장 중요한 상호작용이므로 크게 */
+  .ask{background:rgba(79,140,255,.1);border:1px solid var(--accent);border-radius:12px;
+    padding:16px;margin-bottom:15px}
+  .askq{font-size:15px;font-weight:800;margin-bottom:12px}
+  .askb{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px}
+  button.hb{padding:13px 10px;border:1px solid var(--line);border-radius:9px;
+    background:var(--card2);color:var(--text);font-size:14px;font-weight:700;cursor:pointer;
+    line-height:1.35;font-family:inherit;transition:.12s;text-align:left}
+  button.hb:hover{border-color:var(--accent);background:rgba(79,140,255,.18)}
+  button.hb.on{border-color:var(--accent);background:rgba(79,140,255,.28);color:#fff}
+  /* 추정 크기 확인 */
+  .guessval{font-size:24px;font-weight:800;color:var(--accent);letter-spacing:-.02em;
+    margin-top:4px}
+  .confirm{display:flex;gap:9px;margin-top:13px;flex-wrap:wrap}
+  button.cbtn{flex:1;min-width:150px;padding:14px 12px;border-radius:9px;cursor:pointer;
+    font-size:14.5px;font-weight:800;font-family:inherit;border:1px solid var(--line)}
+  button.cbtn.yes{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button.cbtn.no{background:var(--card2);color:var(--text)}
+  button.cbtn:hover{filter:brightness(1.12)}
+
+  /* 섹션 */
+  .sec{margin-bottom:16px}
+  .sec h3{font-size:13px;margin:0 0 9px;color:var(--muted);font-weight:700;letter-spacing:.03em}
+  ul{margin:0;padding-left:19px}
+  li{margin:6px 0;font-size:14px}
+
+  /* 설치키트 */
+  .kit{background:var(--card2);border:1px solid var(--line);border-radius:10px;
+    padding:13px 14px;margin:8px 0;font-size:14.5px}
+  .kit.need{border-color:var(--warn);background:rgba(240,180,41,.07)}
+  .kit .meta{color:var(--muted);font-size:12.5px;margin-top:4px}
+
+  /* 제품 카드 */
+  .prod{background:var(--card2);border:1px solid var(--line);border-radius:11px;
+    padding:15px;margin:10px 0}
+  .prod.cur{border-color:var(--accent);background:rgba(79,140,255,.06)}
+  .prod .pname{font-size:16.5px;font-weight:800}
+  .prod .pmodel{color:var(--muted);font-size:13px;font-weight:400;margin-left:6px}
+  .prod .meta{color:var(--muted);font-size:13px;margin-top:5px}
+  .tag{display:inline-block;font-size:11px;padding:3px 8px;border-radius:20px;
+    margin-left:6px;background:rgba(79,140,255,.2);color:var(--accent);font-weight:700}
+  .tag.mini{background:rgba(46,192,122,.18);color:var(--ok)}
+  .tag.warn{background:rgba(240,180,41,.2);color:var(--warn)}
+  .fxs{margin-top:9px;display:flex;flex-wrap:wrap;gap:6px}
+  .fx{font-size:12px;padding:4px 9px;border-radius:20px;
+    background:rgba(46,192,122,.13);color:var(--ok)}
+  table.spec{width:100%;border-collapse:collapse;margin-top:11px;font-size:13px}
+  table.spec th{text-align:left;color:var(--muted);font-weight:500;padding:5px 10px 5px 0;
+    white-space:nowrap;vertical-align:top;width:42%}
+  table.spec td{padding:5px 0}
+  a.buy{display:block;margin-top:12px;padding:12px;border-radius:9px;text-align:center;
+    background:var(--naver);color:#fff;font-size:14.5px;font-weight:800;text-decoration:none}
+  a.buy:hover{filter:brightness(1.12)}
+
+  /* 규격표 */
+  .tblwrap{overflow-x:auto}
+  table.req{width:100%;border-collapse:collapse;font-size:12px;min-width:420px}
+  table.req th,table.req td{border:1px solid var(--line);padding:6px 8px;text-align:center}
+  table.req th{background:var(--card2);color:var(--muted);font-weight:600}
+  table.req td.y{color:var(--ok)}table.req td.n{color:var(--no)}
+
+  .ratio{background:var(--card2);border:1px solid var(--accent);border-radius:8px;
+    padding:9px 11px;margin-top:10px;font-size:12.5px;display:none}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid #fff;
+    border-top-color:transparent;border-radius:50%;animation:s .7s linear infinite;
+    vertical-align:-3px;margin-right:7px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:40px 16px;
+    border:1px dashed var(--line);border-radius:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🪟 창문형 에어컨 설치 가능 진단</h1>
+    <div class="sub">창문 사진을 올리면 창틀을 자동 검출해 설치 가능 여부·필요한 키트·추천 모델을 알려드립니다.
+      파세코 공식 설치 규격 기준.</div>
+  </header>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>1. 창문 사진</h2>
+        <div class="drop" id="drop">
+          <div id="dropText">📷 사진을 끌어다 놓거나 클릭해서 업로드</div>
+          <input type="file" id="file" accept="image/*" hidden>
+        </div>
+        <div class="note">창문 전체가 보이도록 정면에서 찍어주세요.</div>
+
+        <details class="mt">
+          <summary>기준물체 설정 (선택)</summary>
+          <div class="note">카드나 A4가 함께 찍혀 있으면 치수를 mm 단위로 정확히 계산합니다. 없어도 됩니다.</div>
+          <select id="reference" class="mt">
+            <option value="auto">자동 감지 (권장)</option>
+            <option value="a4">A4 용지로 지정</option>
+            <option value="card">카드로 지정</option>
+            <option value="none">사용 안 함</option>
+          </select>
+        </details>
+
+        <div id="visionBox">
+          <h2>🔍 사진 분석 결과</h2>
+          <img id="overlay" alt="검출 결과">
+          <div class="legend">
+            <span><i style="background:#00e65a"></i>창 개구부</span>
+            <span><i style="background:#28a0ff"></i>창짝 분리선</span>
+            <span><i style="background:#ffdc28"></i>기준물체</span>
+          </div>
+          <ul id="evidence" class="ev"></ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>2. 창 정보 <span id="autoTag" class="tag" style="display:none">사진 자동입력</span></h2>
+        <label>창 종류</label>
+        <select id="window_type">
+          <option value="unknown">모르겠음 / 사진으로 판단</option>
+          <option value="slide">✅ 미닫이(슬라이딩)창 — 옆으로 미는 창</option>
+          <option value="hung">❌ 오르내리기창 — 위아래로 여는 창</option>
+          <option value="project">❌ 프로젝트창 — 밀어 열기 창</option>
+          <option value="casement">❌ 여닫이창 — 옆으로 여는 창</option>
+          <option value="tilt_turn">❌ 틸트앤턴창 — 기울임＋회전 창</option>
+          <option value="folding">❌ 폴딩도어 및 기타 특수창</option>
+          <option value="fixed">❌ 고정창 — 안 열림</option>
+        </select>
+        <div class="note">❌ 표시된 창은 공식 안내상 <b>구조상 설치 불가</b>입니다.</div>
+
+        <div class="mt">
+          <label>창문 높이 — 창틀 레일 돌출부(손잡이 포함) 기준</label>
+          <select id="height_bucket">
+            <option value="">고르지 않음 (판단 후 선택 가능)</option>
+            <option value="under77">77cm 미만 — 설치 불가</option>
+            <option value="77_92">77~92cm — 미니만 가능</option>
+            <option value="92_132">92~132cm — 작은 방 창문</option>
+            <option value="132_148">132~148cm — 일반 방 창문</option>
+            <option value="148_188">148~188cm — 큰 창</option>
+            <option value="188_230">188~230cm — 베란다 창</option>
+            <option value="230_246">230~246cm — 듀얼/프리미엄만</option>
+            <option value="over246">246cm 이상 — 특수연장키트</option>
+          </select>
+          <div class="note">⚠️ <b>유리 부분만 재면 안 됩니다.</b> 창틀 레일 돌출부(손잡이 포함)까지
+            포함해야 합니다. 설치 가능 범위는 연장키트 포함 <b>77~246cm</b>.</div>
+        </div>
+
+        <details class="mt" id="exactBox">
+          <summary>치수를 정확히 알고 있다면 직접 입력</summary>
+          <div class="row mt">
+            <div><label>가로 폭 (mm)</label>
+              <input type="number" id="width_mm" placeholder="예: 700" min="0"></div>
+            <div><label>세로 높이 (mm)</label>
+              <input type="number" id="height_mm" placeholder="예: 1200" min="0"></div>
+          </div>
+          <div class="note">직접 입력한 값이 위 선택보다 우선합니다.</div>
+          <div class="ratio" id="ratioBox"></div>
+        </details>
+      </div>
+
+      <div class="card">
+        <h2>3. 설치 환경</h2>
+        <div class="checks">
+          <label><input type="checkbox" id="has_screen"> 방충망 있음</label>
+          <label><input type="checkbox" id="has_rail"> 창밖 난간 있음</label>
+          <label><input type="checkbox" id="double_window"> 이중창</label>
+          <label><input type="checkbox" id="has_outlet" checked> 근처 콘센트</label>
+        </div>
+      </div>
+
+      <button class="go" id="go">설치 가능 여부 판단하기</button>
+
+      <div id="placeholder" class="empty" style="margin-top:15px">
+        사진을 올리고 <b>판단하기</b>를 누르면 결과가 여기에 표시됩니다.
+      </div>
+      <div id="result" style="margin-top:15px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== 설치 규격 + 판정 규칙 ===== */
+/* ============================================================
+   창문형 에어컨 설치 판단 — 브라우저 단독 실행판
+   ------------------------------------------------------------
+   GitHub Pages 같은 정적 호스팅에서 서버 없이 돌리기 위해
+   Python 3종(window_ac_specs / rule_engine / vision)을 JS로 포팅했다.
+
+   ⚠️ 규칙·스펙이 Python 쪽과 '두 벌' 존재한다. 설치 규격이나 모델을
+      바꿀 때는 반드시 양쪽을 함께 수정해야 한다.
+      (파이썬: window_ac_specs.py / 여기: 아래 SPECS 블록)
+   ============================================================ */
+
+/* ─────────────────────────────────────────────────────────
+   1. 설치 규격 + 모델 데이터  (window_ac_specs.py 포팅)
+   ───────────────────────────────────────────────────────── */
+const WINDOW_TYPES = {
+  slide:     "미닫이(슬라이딩)창",
+  hung:      "오르내리기창",
+  project:   "프로젝트창(밀어 열기 창)",
+  casement:  "여닫이창(옆으로 여는 창)",
+  tilt_turn: "틸트앤턴창(기울임＋회전 창)",
+  folding:   "폴딩도어 및 기타 특수창",
+  fixed:     "고정창",
+  unknown:   "알 수 없음",
+};
+const IMPOSSIBLE_TYPES = ["hung","project","casement","tilt_turn","folding","fixed"];
+const HEIGHT_BASIS = "창틀 레일 돌출부(손잡이 포함) 기준";
+
+const SIZE_CLASSES = {
+  mini:     "미니 (창틀 높이가 낮은 창에 대응)",
+  standard: "듀얼인버터 / 프리미엄 (일반 사이즈)",
+};
+
+const INSTALL_STANDARDS = {
+  self:       {label:"직접(셀프) 설치",     min_width_mm:380, min_height_mm:{mini:770, standard:920}},
+  technician: {label:"서비스 기사 방문 설치", min_width_mm:330, min_height_mm:{mini:710, standard:900}},
+};
+
+// 설치키트별 대응 창문 높이 (mm) — 파세코 공식 안내
+const KITS = {
+  mini: [
+    {id:"basic", label:"기본 키트",            extra_cm:0,  min_mm:770,  max_mm:1320},
+    {id:"ext56", label:"이지핏 추가키트 56cm", extra_cm:56, min_mm:1330, max_mm:1880},
+    {id:"ext98", label:"이지핏 추가키트 98cm", extra_cm:98, min_mm:1750, max_mm:2300},
+  ],
+  standard: [
+    {id:"basic",      label:"기본 키트",     extra_cm:0,   min_mm:920,  max_mm:1480},
+    {id:"ext56",      label:"추가키트 56cm", extra_cm:56,  min_mm:1490, max_mm:2040},
+    {id:"ext98",      label:"추가키트 98cm", extra_cm:98,  min_mm:1900, max_mm:2460},
+    {id:"ext98_sp40", label:"추가키트 98cm + 특수연장키트 40cm", extra_cm:138,
+     min_mm:2460, max_mm:2860, technician_only:true},
+  ],
+};
+
+// 창문 높이에 맞는 키트 (겹치는 구간은 더 짧은=저렴한 키트 우선)
+function kitForHeight(sc, h, mode){
+  const kits = KITS[sc];
+  let lo = Math.min(...kits.map(k=>k.min_mm));
+  const hi = Math.max(...kits.map(k=>k.max_mm));
+  if(mode === "technician") lo = Math.min(lo, INSTALL_STANDARDS.technician.min_height_mm[sc]);
+  if(h < lo) return [null, "too_short"];
+  if(h > hi) return [null, "too_tall"];
+  for(const k of kits){
+    let kMin = k.min_mm;
+    if(k.id === "basic" && mode === "technician")
+      kMin = INSTALL_STANDARDS.technician.min_height_mm[sc];
+    if(kMin <= h && h <= k.max_mm) return [k, "ok"];
+  }
+  return [null, "gap"];   // 키트 대응 구간 사이의 빈 구간
+}
+
+function heightRangeText(sc){
+  const kits = KITS[sc];
+  const lo = Math.min(...kits.map(k=>k.min_mm))/10;
+  const hi = Math.max(...kits.map(k=>k.max_mm))/10;
+  return `${lo}~${hi}cm (추가키트 포함)`;
+}
+
+// ⚠️ cooling_kw / power_w / noise_db / area_pyeong 은 자료가 없어 비워둠.
+//    지어내지 않았으며, UI는 값이 있는 항목만 표시한다.
+const PRODUCTS = [
+  {model:"PWA-2100W", year:2019, gen:"1세대", name:"정속형", size_class:"standard",
+   compressor:"정속형", features:"세로형 창문형 에어컨의 포문을 연 모델", highlights:[]},
+  {model:"PWA-3200W 계열", year:2020, gen:"2세대", name:"싱글 인버터", size_class:"standard",
+   compressor:"싱글 인버터", features:"싱글 인버터 탑재로 소음·전기료 대폭 절감",
+   highlights:["소음 저감","전기료 절감"]},
+  {model:"PWA-2200W", year:2020, gen:"2세대", name:"정속형", size_class:"standard",
+   compressor:"정속형", features:"2세대 정속형 모델", highlights:[]},
+  {model:"PWA-3300WP 계열", year:2021, gen:"3세대", name:"듀얼 인버터", size_class:"standard",
+   compressor:"듀얼 인버터", features:"듀얼 인버터 컴프레서로 에너지 효율 극대화",
+   highlights:["에너지 효율"]},
+  {model:"PWA-M3100WP 계열", year:2021, gen:"3세대", name:"미니", size_class:"mini",
+   features:"높이가 낮은 작은 창문에도 설치 가능한 미니 사이즈 라인업",
+   highlights:["낮은 창 대응"]},
+  {model:"PWA-3400W 계열", year:2022, gen:"4세대", name:"프리미엄 1", size_class:"standard",
+   features:"나사 조임 없이 설치하는 '이지핏' 키트 적용, 디자인 고급화",
+   highlights:["이지핏 키트","간편 설치"]},
+  {model:"PWA-3500 계열 (PB/PS)", year:2023, gen:"5세대", name:"프리미엄 2", size_class:"standard",
+   url:"https://brand.naver.com/paseco/products/8288246728",
+   features:"소음을 더 줄이고 스마트폰 제어(IoT) 등 편의 기능 강화",
+   highlights:["저소음","스마트폰 제어(IoT)"]},
+  {model:"PWA-M3500 계열", year:2023, gen:"5세대", name:"프리미엄 미니", size_class:"mini",
+   url:"https://brand.naver.com/paseco/products/8285589510",
+   features:"프리미엄 미니 모델", highlights:["낮은 창 대응"]},
+  {model:"PHA-M3240BE", year:2024, gen:"하이브리드 1세대", name:"하이브리드 1", size_class:"mini",
+   features:"전용 키트로 캠핑용·이동식 실내 제습 에어컨으로 분리해 쓸 수 있는 다목적 모델",
+   highlights:["캠핑용 분리 사용","이동식 제습"]},
+  {model:"PWA-3600 계열", year:2025, gen:"6세대", name:"프리미엄 3", size_class:"standard",
+   url:"https://brand.naver.com/paseco/products/11809805737",
+   features:"업계 최초로 가동 중에도 바깥 공기를 유입/배출하는 '환기 기능' 탑재",
+   highlights:["환기 기능(업계 최초)"]},
+  {model:"PHA-M3601BE2", year:2026, gen:"2026년형", name:"하이브리드 2", size_class:"mini",
+   current:true, url:"https://brand.naver.com/paseco/products/13257948495",
+   features:"스탠드·캠핑 키트를 결합해 다목적으로 쓰는 하이브리드 완성형",
+   highlights:["캠핑 모드(소비전력 500~800W 조절)","AI 에너지 세이빙","스탠드·캠핑 키트 결합"]},
+  {model:"PWA-3650PS", year:2026, gen:"2026년형", name:"프리미엄 3 프로", size_class:"standard",
+   current:true, url:"https://brand.naver.com/paseco/products/13376159657",
+   features:"환기 기능을 지원하는 최상위 모델",
+   highlights:["환기 기능","더블 이지핏 키트 기본 적용","빛·벌레 차단 강화"]},
+  {model:"PWA-3301BE2", year:2026, gen:"2026년형", name:"듀얼 인버터 2", size_class:"standard",
+   current:true, compressor:"듀얼 인버터", url:"https://brand.naver.com/paseco/products/13257769842",
+   features:"동일 소비전력 대비 냉방 효율이 가장 뛰어난 가성비 주력 모델",
+   highlights:["냉방 효율 최고","전기요금 절약"]},
+];
+
+// 구매 링크가 있는 '현재 판매 모델'만 추천한다 (단종 모델은 이력 참고용)
+function productsByClass(sc, sellableOnly = true){
+  return PRODUCTS.filter(p => p.size_class === sc && (!sellableOnly || p.url));
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   2. 판정 규칙  (rule_engine.py 포팅)
+   ───────────────────────────────────────────────────────── */
+const V_OK="가능", V_TECH="기사 방문 시 가능", V_NO="불가", V_INSUF="정보 부족";
+
+function envCautions(hasScreen, hasRail, doubleWindow, hasOutlet){
+  const c = [];
+  if(hasScreen) c.push("방충망이 있으면 설치 구간의 방충망을 탈거해야 합니다.");
+  if(doubleWindow) c.push("이중창은 안쪽/바깥쪽 중 어느 레일에 설치할지 확인이 필요하며, 완전 밀폐가 어려울 수 있습니다.");
+  if(hasRail) c.push("창밖 난간이 있으면 본체·실외 토출부와의 간섭 여부를 확인하세요.");
+  else c.push("난간이 없는 창은 낙하 위험이 있으니 안전바·고정 브래킷을 반드시 사용하세요.");
+  if(!hasOutlet) c.push("근처에 전용 콘센트가 없으면 별도 전기 공사가 필요할 수 있습니다.");
+  c.push("설치 전 창틀이 본체 하중을 견디는지, 창틀 재질·고정 상태를 확인하세요.");
+  c.push(`창문 높이는 ${HEIGHT_BASIS}으로 측정합니다 (유리 부분만 재면 실제보다 작게 나옵니다).`);
+  return c;
+}
+
+function requirementsTable(){
+  return Object.entries(INSTALL_STANDARDS).map(([mode, std]) => ({
+    mode, label: std.label, min_width_mm: std.min_width_mm,
+    mini_min_height_mm: std.min_height_mm.mini,
+    standard_min_height_mm: std.min_height_mm.standard,
+  }));
+}
+
+function early(verdict, wtLabel, reasons, cautions, recs){
+  return {verdict, window_type_label:wtLabel, install_mode:null, fit_classes:[],
+    kit_info:[], height_basis:HEIGHT_BASIS, reasons, cautions,
+    fit_products:[], recommendations:recs, requirements:requirementsTable()};
+}
+
+function dimensionReasons(w, h, verdict, mode, classes){
+  const out = [];
+  if(verdict === V_NO){
+    const tw = INSTALL_STANDARDS.technician.min_width_mm;
+    if(w < tw) out.push(`가로 폭 ${w/10}cm가 최소 기준 ${tw/10}cm(기사 방문 설치)보다 좁습니다.`);
+    const hr = [];
+    for(const sc of Object.keys(SIZE_CLASSES)){
+      const [, why] = kitForHeight(sc, h, "technician");
+      const nm = SIZE_CLASSES[sc].split(" (")[0];
+      const lo = Math.min(...KITS[sc].map(k=>k.min_mm))/10;
+      const hi = Math.max(...KITS[sc].map(k=>k.max_mm))/10;
+      if(why === "too_short") hr.push(`${nm}은 최소 ${lo}cm 필요`);
+      else if(why === "too_tall") hr.push(`${nm}은 최대 ${hi}cm까지 가능`);
+      else if(why === "gap") hr.push(`${nm}은 키트 대응 구간 사이 빈 구간에 걸림`);
+    }
+    if(hr.length) out.push(`창문 높이 ${h/10}cm — ` + hr.join(" / ") + ".");
+    else if(w >= tw) out.push(`입력 치수(${w/10}×${h/10}cm)가 어떤 모델의 설치 기준에도 맞지 않습니다.`);
+    return out;
+  }
+  const label = INSTALL_STANDARDS[mode].label;
+  const names = classes.map(sc => SIZE_CLASSES[sc].split(" (")[0]).join(", ");
+  out.push(`가로 폭 ${w/10}cm · 창문 높이 ${h/10}cm는 ${label} 기준을 만족합니다 → ${names} 설치 가능.`);
+  return out;
+}
+
+function recommend(verdict, classes, kitInfo){
+  const r = [];
+  for(const k of (kitInfo||[])){
+    if(k.extra_cm > 0)
+      r.push(`⚠️ 본체와 함께 <b>${k.kit_label}</b>를 구매해야 합니다 ` +
+             `(${k.size_class_label.split(" (")[0]} 기준, 대응 ${k.range_cm}).`);
+  }
+  if(verdict === V_NO){
+    r.push("현재 창 규격으로는 설치가 어렵습니다. 다른 방 창문 치수를 확인해 보거나 이동식 에어컨을 검토하세요.");
+    r.push("창틀 확장·보조 프레임 시공이 가능한지 대리점에 문의해 볼 수 있습니다.");
+    return r;
+  }
+  if(verdict === V_TECH)
+    r.push("셀프 설치는 불가하므로 구매 시 '서비스 기사 방문 설치'를 함께 신청하세요.");
+  if(classes.includes("standard")){
+    r.push("전기요금 절약이 우선이면 **듀얼 인버터 2 (PWA-3301BE2)** — 동일 소비전력 대비 냉방 효율이 가장 좋은 가성비 주력 모델입니다.");
+    r.push("환기 기능과 최상위 사양을 원하면 **프리미엄 3 프로 (PWA-3650PS)** — 더블 이지핏 키트로 빛·벌레 차단력도 높습니다.");
+  }
+  if(classes.includes("mini")){
+    r.push("창틀이 낮거나 캠핑·이동식으로도 쓰려면 **하이브리드 2 (PHA-M3601BE2)** — 캠핑 모드와 AI 에너지 세이빙을 지원합니다.");
+    if(classes.length === 1) r.push("현재 창문 높이에서는 미니 사이즈 라인업만 설치 가능합니다.");
+  }
+  return r;
+}
+
+function analyzeRules(o){
+  let {windowType, widthMm, heightMm, hasScreen, hasRail, doubleWindow, hasOutlet} = o;
+  const reasons = [], cautions = [];
+  const wtLabel = WINDOW_TYPES[windowType] || "알 수 없음";
+
+  if(windowType === "unknown")
+    return early(V_INSUF, wtLabel,
+      ["창 종류를 확인할 수 없습니다. 미닫이(슬라이딩)창인지 확인이 필요합니다."],
+      envCautions(hasScreen, hasRail, doubleWindow, hasOutlet),
+      ["먼저 창이 옆으로 미는 미닫이창인지 확인하세요."]);
+
+  if(IMPOSSIBLE_TYPES.includes(windowType))
+    return early(V_NO, wtLabel,
+      [`현재 창은 '${wtLabel}'입니다. 파세코 공식 안내에서 구조상 설치가 불가한 창으로 분류됩니다.`,
+       "창문형 에어컨은 옆으로 미는 미닫이(슬라이딩)창에만 설치할 수 있습니다."],
+      envCautions(hasScreen, hasRail, doubleWindow, hasOutlet),
+      ["집에 미닫이(슬라이딩)창이 있는 다른 방이 있다면 그 창으로 확인해 보세요.",
+       "미닫이창이 없다면 '이동식 에어컨'이 현실적 대안입니다.",
+       "창의 구조·형태에 따라 예외가 있을 수 있어 구매 전 대리점 문의를 권합니다."]);
+
+  reasons.push("미닫이(슬라이딩)창으로, 창문형 에어컨 설치의 기본 조건을 만족합니다.");
+
+  // 가로 폭 기준(38cm)은 낮아 일반 미닫이창은 사실상 모두 충족 → 모르면 충족으로 보고 명시
+  const widthUnverified = (widthMm == null);
+  if(widthUnverified && heightMm != null) widthMm = INSTALL_STANDARDS.self.min_width_mm;
+
+  if(heightMm == null){
+    reasons.push("설치 가능 여부와 필요한 키트를 가르는 기준은 <b>창문 높이</b> 하나입니다.");
+    reasons.push("사진에는 축척 정보가 없어 높이를 사진만으로 알아낼 수 없습니다. 아래에서 골라주세요.");
+    const out = early(V_INSUF, wtLabel, reasons,
+      envCautions(hasScreen, hasRail, doubleWindow, hasOutlet),
+      [`창문 높이를 골라주세요 (${HEIGHT_BASIS}). 방 창문은 보통 120~150cm, 베란다 전체 창은 190~230cm입니다.`]);
+    out.needs = "height";
+    return out;
+  }
+
+  // 규격 대조 (셀프 → 기사 방문)
+  const fits = {}, kitsNeeded = {};
+  for(const mode of ["self","technician"]){
+    for(const sc of Object.keys(SIZE_CLASSES)){
+      const needW = INSTALL_STANDARDS[mode].min_width_mm;
+      const [kit] = kitForHeight(sc, heightMm, mode);
+      let ok = widthMm >= needW && kit != null;
+      if(kit && kit.technician_only && mode === "self") ok = false;
+      fits[mode+"|"+sc] = ok;
+      if(ok) kitsNeeded[mode+"|"+sc] = kit;
+    }
+  }
+  const selfC = Object.keys(SIZE_CLASSES).filter(sc => fits["self|"+sc]);
+  const techC = Object.keys(SIZE_CLASSES).filter(sc => fits["technician|"+sc]);
+
+  let verdict, mode, classes;
+  if(selfC.length){ verdict=V_OK;   mode="self";       classes=selfC; }
+  else if(techC.length){ verdict=V_TECH; mode="technician"; classes=techC; }
+  else { verdict=V_NO; mode=null; classes=[]; }
+
+  reasons.push(...dimensionReasons(widthMm, heightMm, verdict, mode, classes));
+
+  // 필요한 설치키트
+  const kitInfo = [];
+  for(const sc of classes){
+    const k = kitsNeeded[mode+"|"+sc];
+    if(!k) continue;
+    kitInfo.push({size_class:sc, size_class_label:SIZE_CLASSES[sc], kit_id:k.id,
+      kit_label:k.label, extra_cm:k.extra_cm,
+      range_cm:`${k.min_mm/10}~${k.max_mm/10}cm`,
+      technician_only:!!k.technician_only});
+    const nm = SIZE_CLASSES[sc].split(" (")[0];
+    reasons.push(k.extra_cm > 0
+      ? `${nm}: 창문 높이 ${heightMm/10}cm는 기본 키트 범위를 넘어 <b>${k.label}</b>가 추가로 필요합니다.`
+      : `${nm}: 기본 키트로 설치 가능합니다 (추가키트 구매 불필요).`);
+  }
+
+  // 설치 가능 모델 (판매 중인 것만)
+  const fitProducts = [];
+  for(const sc of classes){
+    const k = kitsNeeded[mode+"|"+sc];
+    for(const p of productsByClass(sc)){
+      fitProducts.push({...p, size_class_label:SIZE_CLASSES[sc],
+        install_height_range: heightRangeText(sc),
+        required_kit: k ? k.label : null,
+        required_kit_extra_cm: k ? k.extra_cm : 0,
+        current: !!p.current});
+    }
+  }
+  fitProducts.sort((a,b) => b.year - a.year || a.model.localeCompare(b.model));
+
+  cautions.push(...envCautions(hasScreen, hasRail, doubleWindow, hasOutlet));
+  if(widthUnverified)
+    cautions.unshift(`가로 폭은 확인하지 않았습니다 — 창을 열었을 때 폭이 ` +
+      `${INSTALL_STANDARDS.self.min_width_mm/10}cm 이상이면 됩니다 (일반 미닫이창은 대부분 충족).`);
+  if(verdict === V_TECH)
+    cautions.unshift("셀프 설치 규격에는 미달합니다. 반드시 서비스 기사 방문 설치로 진행하세요.");
+  if(kitInfo.some(k=>k.technician_only))
+    cautions.unshift("특수연장키트는 설치 기사 방문이 필요합니다.");
+  if(kitInfo.some(k=>k.extra_cm>0))
+    cautions.unshift("본체와 별도로 추가키트를 함께 구매해야 합니다.");
+
+  return {verdict, window_type_label:wtLabel,
+    install_mode: mode ? INSTALL_STANDARDS[mode].label : null,
+    fit_classes: classes.map(sc=>SIZE_CLASSES[sc]),
+    kit_info:kitInfo, height_basis:HEIGHT_BASIS, width_unverified:widthUnverified,
+    reasons, cautions, fit_products:fitProducts,
+    recommendations: recommend(verdict, classes, kitInfo),
+    requirements: requirementsTable()};
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   3. 높이 구간 판정  (server.py 포팅)
+   ───────────────────────────────────────────────────────── */
+const HEIGHT_BUCKETS = {
+  under77:[400,770], "77_92":[770,920], "92_132":[920,1320], "132_148":[1320,1480],
+  "148_188":[1480,1880], "188_230":[1880,2300], "230_246":[2300,2460], over246:[2460,2860],
+};
+const TYPICAL_HEIGHT_MM = 1400, TYPICAL_BUCKET = "132_148";
+
+// 구간 양 끝에서 판정이 같을 때만 확정한다. 다르면 실측을 요청.
+function judgeWithBand(band, ratio, base){
+  const [lo, hi] = band;
+  const outs = [lo, hi].map(h => analyzeRules({
+    ...base, widthMm: ratio ? Math.round(h/ratio) : null, heightMm: h}));
+
+  const sameV = outs[0].verdict === outs[1].verdict;
+  const sameC = JSON.stringify(outs[0].fit_classes) === JSON.stringify(outs[1].fit_classes);
+  if(sameV && sameC){
+    const res = outs[1].verdict !== V_NO ? outs[1] : outs[0];
+    res.band_conclusive = true;
+    res.reasons = [`창문 높이를 ${lo/10}~${hi/10}cm 구간으로 보고 판정했습니다. ` +
+      `이 구간 전체가 같은 결과라 확정할 수 있습니다.`]
+      .concat(res.reasons.filter(x => !x.includes("창문 높이") && !x.includes("창틀 높이")));
+
+    // 판정은 같아도 '필요한 키트'가 구간 안에서 갈릴 수 있다
+    const k0 = {}, k1 = {};
+    outs[0].kit_info.forEach(k => k0[k.size_class] = k.kit_label);
+    outs[1].kit_info.forEach(k => k1[k.size_class] = k.kit_label);
+    const pairs = [];
+    for(const sc of new Set([...Object.keys(k0), ...Object.keys(k1)])){
+      if(k0[sc] && k1[sc] && k0[sc] !== k1[sc]){
+        const nm = sc === "mini" ? "미니·하이브리드" : "듀얼/프리미엄";
+        pairs.push(`${nm}: ${lo/10}cm쪽이면 ${k0[sc]}, ${hi/10}cm쪽이면 ${k1[sc]}`);
+      }
+    }
+    if(pairs.length){
+      res.kit_ambiguous = true;
+      res.recommendations = ["⚠️ 이 높이 구간에서는 필요한 키트가 갈립니다 — " + pairs.join(" / ") +
+        ". 키트를 잘못 사면 설치가 안 되니 실측 후 주문하세요."].concat(res.recommendations);
+    }
+    return res;
+  }
+
+  const res = outs[0];
+  res.verdict = V_INSUF;
+  res.band_conclusive = false;
+  res.fit_products = [];
+  res.reasons = [
+    `창문 높이 ${lo/10}~${hi/10}cm 구간이 파세코 설치 기준선을 걸칩니다 ` +
+    `(${lo/10}cm면 '${outs[0].verdict}', ${hi/10}cm면 '${outs[1].verdict}').`,
+    "이 구간에서는 몇 cm 차이로 결과가 바뀌므로 줄자 실측이 필요합니다."];
+  res.recommendations = [
+    `창문 높이를 줄자로 재서 직접 입력해 주세요 (${HEIGHT_BASIS}). 이 창은 기준선에 가까워 정확한 값이 꼭 필요합니다.`];
+  return res;
+}
+
+const cmOf = v => Math.round(v/10);
+
+function sizeEstimate(w, h, band, ratio, sources){
+  if(w && h) return {exact:true, width_cm:cmOf(w), height_cm:cmOf(h),
+    source: sources.width_mm || sources.height_mm || "user",
+    text:`가로 약 ${cmOf(w)}cm × 세로 약 ${cmOf(h)}cm`};
+  if(band){
+    const [lo,hi] = band;
+    const out = {exact:false, height_cm_range:[cmOf(lo),cmOf(hi)],
+      source: sources.height_mm || "bucket", ratio, text:`세로 ${cmOf(lo)}~${cmOf(hi)}cm`};
+    if(ratio){
+      out.width_ref_text = `사진 비율(${ratio.toFixed(2)})로 계산한 가로는 ` +
+        `약 ${cmOf(lo/ratio)}~${cmOf(hi/ratio)}cm입니다 — 정면 촬영이 아니면 오차가 큽니다.`;
+    }
+    return out;
+  }
+  return null;
+}
+
+// '이 크기가 맞나요?' 로 물어볼 값. 실측이 있으면 실측, 없으면 통계적 출발점.
+function sizeGuess(vis, ratio){
+  if(vis && vis.ok && vis.est_height_mm)
+    return {measured:true, width_cm:cmOf(vis.est_width_mm), height_cm:cmOf(vis.est_height_mm),
+      height_mm:vis.est_height_mm, width_mm:vis.est_width_mm,
+      source:vis.scale_source, ratio};
+  const h = TYPICAL_HEIGHT_MM;
+  const out = {measured:false, height_cm:cmOf(h), height_mm:h, bucket:TYPICAL_BUCKET, ratio};
+  if(ratio) out.width_cm = cmOf(h/ratio);
+  return out;
+}
+
+/* 최종 판정 — server.py 의 /api/analyze 흐름 */
+function judge(input, vis){
+  const sources = {};
+  let eff = input.windowType;
+  if(!eff || eff === "unknown"){
+    eff = null;
+    if(vis && vis.ok && vis.window_type !== "unknown" && vis.window_type_confidence >= 0.5){
+      eff = vis.window_type; sources.window_type = "photo";
+    }
+    eff = eff || "unknown";
+  } else sources.window_type = "user";
+
+  let w = input.widthMm, h = input.heightMm;
+  sources.width_mm  = w ? "user" : null;
+  sources.height_mm = h ? "user" : null;
+  const ratio = vis && vis.ok ? vis.ratio_hw : null;
+
+  // 사용자가 높이 구간을 직접 골랐다면 사진 실측값보다 우선한다.
+  // (그렇지 않으면 기준물체가 잡힌 사진에서 사용자의 정정이 무시된다)
+  const pickedBucket = !!HEIGHT_BUCKETS[input.heightBucket];
+
+  if(vis && vis.ok && !pickedBucket){
+    if(w == null && vis.est_width_mm){  w = vis.est_width_mm;  sources.width_mm  = "photo"; }
+    if(h == null && vis.est_height_mm){ h = vis.est_height_mm; sources.height_mm = "photo"; }
+    if(ratio){
+      if(w && !h){ h = Math.round(w*ratio); sources.height_mm = "ratio"; }
+      else if(h && !w){ w = Math.round(h/ratio); sources.width_mm = "ratio"; }
+    }
+  }
+
+  let scr = input.hasScreen, rail = input.hasRail;
+  if(vis && vis.ok){
+    if(vis.has_screen && !scr){ scr = true; sources.has_screen = "photo"; }
+    if(vis.has_rail && !rail){ rail = true; sources.has_rail = "photo"; }
+  }
+
+  const base = {windowType:eff, hasScreen:scr, hasRail:rail,
+    doubleWindow:input.doubleWindow, hasOutlet:input.hasOutlet};
+
+  let band = null;
+  if(h == null && pickedBucket){
+    band = HEIGHT_BUCKETS[input.heightBucket];
+    sources.height_mm = "bucket";
+  }
+
+  let result;
+  if(h != null) result = analyzeRules({...base, widthMm:w, heightMm:h});
+  else if(band && eff === "slide"){
+    result = judgeWithBand(band, ratio, base);
+    result.height_band = band;
+  } else result = analyzeRules({...base, widthMm:w, heightMm:h});
+
+  result.size_estimate = sizeEstimate(w, h, band, ratio, sources);
+  if(result.needs === "height" || sources.height_mm === "photo")
+    result.size_check = sizeGuess(vis, ratio);
+  result.vision = vis;
+  result.used = {window_type:eff, width_mm:w, height_mm:h, has_screen:scr, has_rail:rail};
+  result.sources = sources;
+  return result;
+}
+
+/* ===== 사진 영상분석 ===== */
+/* ============================================================
+   창문 사진 영상분석 — 브라우저 단독 실행판 (vision.py 포팅)
+   ------------------------------------------------------------
+   OpenCV 없이 Canvas ImageData 위에서 직접 구현했다.
+   (opencv.js 는 8MB라 정적 호스팅에 부적합)
+
+     1) 창 개구부   — Otsu 밝기 분할 + 연결요소 라벨링
+     2) 창짝 분리선 — 열 평균 밝기의 '어두운 띠' 검출
+     3) 방충망      — 고주파 텍스처 + 양방향 주기성
+     4) 창밖 난간   — 세로 에지 투영의 자기상관 주기
+     5) 실제 치수   — A4/카드 기준물체로 픽셀↔mm 환산
+
+   ⚠️ Python 판과 알고리즘은 같지만 기준물체 검출은 회전 사각형
+      (minAreaRect) 대신 바운딩박스를 쓴다. 기준물체가 크게 기울어져
+      찍히면 Python 판보다 검출률이 낮다.
+   ============================================================ */
+
+const REFERENCES = { a4:[297.0,210.0], card:[85.6,53.98] };
+const MAX_W = 1024;      // 분석용 리사이즈 폭
+const FULL_W = 2000;     // 방충망 분석용 원본 폭 상한
+
+/* ── 공통 유틸 ───────────────────────────────────────────── */
+function toGray(imgData){
+  const {width:w, height:h, data:d} = imgData;
+  const g = new Float32Array(w*h);
+  for(let i=0, p=0; i<d.length; i+=4, p++)
+    g[p] = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+  return {g, w, h};
+}
+
+function drawToCanvas(img, maxW){
+  const s = Math.min(1, maxW / img.width);
+  const w = Math.max(1, Math.round(img.width*s)), h = Math.max(1, Math.round(img.height*s));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d', {willReadFrequently:true});
+  ctx.drawImage(img, 0, 0, w, h);
+  return {canvas:c, ctx, scale:s, w, h};
+}
+
+// 가우시안 근사(박스 블러 3회) — 세로/가로 분리 적용
+function blur(g, w, h, radius){
+  let src = g, dst = new Float32Array(w*h);
+  for(let pass=0; pass<3; pass++){
+    // 가로
+    for(let y=0; y<h; y++){
+      let sum=0, cnt=0;
+      for(let x=0; x<w; x++){
+        const x0=Math.max(0,x-radius), x1=Math.min(w-1,x+radius);
+        if(x===0){ sum=0; cnt=0; for(let k=x0;k<=x1;k++){sum+=src[y*w+k];cnt++;} }
+        else{
+          const add=x+radius, rem=x-radius-1;
+          if(add<w){ sum+=src[y*w+add]; cnt++; }
+          if(rem>=0){ sum-=src[y*w+rem]; cnt--; }
+        }
+        dst[y*w+x] = sum/cnt;
+      }
+    }
+    [src, dst] = [dst, src];
+    // 세로
+    for(let x=0; x<w; x++){
+      let sum=0, cnt=0;
+      for(let y=0; y<h; y++){
+        const y0=Math.max(0,y-radius), y1=Math.min(h-1,y+radius);
+        if(y===0){ sum=0; cnt=0; for(let k=y0;k<=y1;k++){sum+=src[k*w+x];cnt++;} }
+        else{
+          const add=y+radius, rem=y-radius-1;
+          if(add<h){ sum+=src[add*w+x]; cnt++; }
+          if(rem>=0){ sum-=src[rem*w+x]; cnt--; }
+        }
+        dst[y*w+x] = sum/cnt;
+      }
+    }
+    [src, dst] = [dst, src];
+  }
+  return src;
+}
+
+// Otsu 임계값
+function otsu(g){
+  const hist = new Float64Array(256);
+  for(let i=0;i<g.length;i++) hist[Math.min(255, Math.max(0, g[i]|0))]++;
+  const total = g.length;
+  let sum=0; for(let t=0;t<256;t++) sum += t*hist[t];
+  let sumB=0, wB=0, best=0, thr=0;
+  for(let t=0;t<256;t++){
+    wB += hist[t]; if(!wB) continue;
+    const wF = total - wB; if(!wF) break;
+    sumB += t*hist[t];
+    const mB = sumB/wB, mF = (sum-sumB)/wF;
+    const between = wB*wF*(mB-mF)*(mB-mF);
+    if(between > best){ best = between; thr = t; }
+  }
+  return thr;
+}
+
+/* 이진 마스크 모폴로지 (정사각 커널, 분리 적용)
+   ⚠️ 필수 단계다. 창짝 분리선이 밝은 창 영역을 두 조각으로 쪼개기 때문에,
+      CLOSE 로 틈을 메우지 않으면 창의 절반만 개구부로 잡힌다. */
+function morph(mask, w, h, r, mode){          // mode: 'dilate' | 'erode'
+  const pick = mode === 'dilate' ? Math.max : Math.min;
+  const tmp = new Uint8Array(w*h), out = new Uint8Array(w*h);
+  for(let y=0;y<h;y++){                        // 가로
+    for(let x=0;x<w;x++){
+      let v = mask[y*w+x];
+      for(let k=Math.max(0,x-r); k<=Math.min(w-1,x+r); k++) v = pick(v, mask[y*w+k]);
+      tmp[y*w+x] = v;
+    }
+  }
+  for(let x=0;x<w;x++){                         // 세로
+    for(let y=0;y<h;y++){
+      let v = tmp[y*w+x];
+      for(let k=Math.max(0,y-r); k<=Math.min(h-1,y+r); k++) v = pick(v, tmp[k*w+x]);
+      out[y*w+x] = v;
+    }
+  }
+  return out;
+}
+const morphClose = (m,w,h,r) => morph(morph(m,w,h,r,'dilate'), w,h,r,'erode');
+const morphOpen  = (m,w,h,r) => morph(morph(m,w,h,r,'erode'),  w,h,r,'dilate');
+
+// 연결요소 라벨링 → {x,y,w,h,area} 목록 (반복 스택 방식)
+function components(mask, w, h, minArea){
+  const seen = new Uint8Array(w*h), out = [];
+  const stack = new Int32Array(w*h);
+  for(let i=0;i<w*h;i++){
+    if(!mask[i] || seen[i]) continue;
+    let sp=0; stack[sp++]=i; seen[i]=1;
+    let minX=w, maxX=-1, minY=h, maxY=-1, area=0;
+    while(sp>0){
+      const p = stack[--sp];
+      const x = p % w, y = (p/w)|0;
+      area++;
+      if(x<minX)minX=x; if(x>maxX)maxX=x;
+      if(y<minY)minY=y; if(y>maxY)maxY=y;
+      if(x>0   && mask[p-1] && !seen[p-1]){ seen[p-1]=1; stack[sp++]=p-1; }
+      if(x<w-1 && mask[p+1] && !seen[p+1]){ seen[p+1]=1; stack[sp++]=p+1; }
+      if(y>0   && mask[p-w] && !seen[p-w]){ seen[p-w]=1; stack[sp++]=p-w; }
+      if(y<h-1 && mask[p+w] && !seen[p+w]){ seen[p+w]=1; stack[sp++]=p+w; }
+    }
+    if(area >= minArea)
+      out.push({x:minX, y:minY, w:maxX-minX+1, h:maxY-minY+1, area});
+  }
+  return out;
+}
+
+// 자기상관으로 규칙적 반복 강도 측정 → [score, period]
+function periodicity(prof, minP, maxP){
+  const n = prof.length;
+  if(n < maxP*3) return [0,0];
+  let mean=0; for(const v of prof) mean += v; mean /= n;
+  const p = new Float64Array(n);
+  let ac0 = 0;
+  for(let i=0;i<n;i++){ p[i] = prof[i]-mean; ac0 += p[i]*p[i]; }
+  if(ac0 <= 1e-9) return [0,0];
+  const lo = Math.max(1, minP|0), hi = Math.min(maxP|0, n-1);
+  if(hi <= lo) return [0,0];
+  const ac = k => { let s=0; for(let i=0;i+k<n;i++) s += p[i]*p[i+k]; return s/ac0; };
+  let bestK = lo, bestV = -1;
+  for(let k=lo;k<=hi;k++){ const v = ac(k); if(v>bestV){ bestV=v; bestK=k; } }
+  let harm=0, cnt=0;
+  for(const m of [2,3]){ const idx = bestK*m; if(idx < n){ harm += Math.max(0, ac(idx)); cnt++; } }
+  harm = cnt ? harm/cnt : 0;
+  return [Math.min(1, Math.max(0, bestV*0.7 + harm*0.3)), bestK];
+}
+
+/* ── 1) 창 개구부 검출 ───────────────────────────────────── */
+function detectOpening(g, w, h){
+  const sm = blur(g, w, h, 3);
+  const thr = otsu(sm);
+  let mask = new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++) mask[i] = sm[i] > thr ? 1 : 0;
+
+  // 창짝 분리선이 만든 틈을 메우고(CLOSE) 잔잡음을 제거(OPEN)한다.
+  // 커널 반경은 창 폭 대비로 잡아 분리선(보통 폭의 1~3%)을 확실히 건너뛴다.
+  const r = Math.max(4, Math.round(w * 0.012));
+  mask = morphClose(mask, w, h, r);
+  mask = morphOpen(mask, w, h, 2);
+
+  const imgArea = w*h;
+  const comps = components(mask, w, h, imgArea*0.03);
+  let best = null;
+  for(const c of comps){
+    const boxArea = c.w*c.h;
+    if(boxArea < imgArea*0.03 || boxArea > imgArea*0.97) continue;
+    if(c.area/boxArea < 0.55) continue;           // 사각형에 가까운가
+    if(!best || boxArea > best.w*best.h) best = c;
+  }
+  if(best){
+    const frac = (best.w*best.h)/imgArea;
+    const conf = (frac >= 0.10 && frac <= 0.80) ? 0.75 : 0.45;
+    return [[best.x, best.y, best.w, best.h], conf, "brightness"];
+  }
+  return [[0,0,w,h], 0.10, "fallback"];
+}
+
+/* ── 2) 창짝 분리선 = 어두운 세로 띠 ─────────────────────── */
+function detectMullions(g, w, h, box, railPeriod){
+  const [bx, by, bw, bh] = box;
+  const pad = Math.floor(bw*0.12);          // 좌우 창틀 제외
+  const x0 = bx+pad, x1 = bx+bw-pad;
+  const y0 = by+Math.floor(bh*0.15), y1 = by+Math.floor(bh*0.85);
+  const n = x1-x0;
+  if(n < 12 || y1-y0 < 10) return [[], 0];
+
+  const prof = new Float64Array(n);
+  for(let i=0;i<n;i++){
+    let s=0, c=0;
+    for(let y=y0;y<y1;y++){ s += g[y*w + x0+i]; c++; }
+    prof[i] = s/c;
+  }
+  // 넓은 이동평균 = 주변 밝기 기준선
+  const k = Math.max(9, (Math.floor(n*0.18)|1));
+  const base = new Float64Array(n);
+  for(let i=0;i<n;i++){
+    let s=0,c=0;
+    for(let j=Math.max(0,i-(k>>1)); j<=Math.min(n-1,i+(k>>1)); j++){ s+=prof[j]; c++; }
+    base[i] = s/c;
+  }
+  const dark = new Float64Array(n);
+  let dmax = 0;
+  for(let i=0;i<n;i++){ dark[i] = base[i]-prof[i]; if(dark[i]>dmax) dmax = dark[i]; }
+  if(dmax <= 0) return [[], 0];
+  const thr = Math.max(3.0, 0.40*dmax);
+
+  const bands = [];
+  let st = -1;
+  for(let i=0;i<n;i++){
+    if(dark[i] > thr){ if(st<0) st = i; }
+    else if(st >= 0){ bands.push([st, i-1]); st = -1; }
+  }
+  if(st >= 0) bands.push([st, n-1]);
+
+  const loW = Math.max(2, Math.floor(bw*0.008)), hiW = Math.max(4, Math.floor(bw*0.14));
+  let cand = [];
+  for(const [a,b] of bands){
+    const bwid = b-a+1;
+    if(bwid < loW || bwid > hiW) continue;
+    let s=0; for(let i=a;i<=b;i++) s += dark[i];
+    cand.push({center: Math.round((a+b)/2)+x0, width:bwid, strength: s/bwid});
+  }
+  if(!cand.length) return [[], 0];
+
+  // 난간 막대는 얇고 반복적 → 두꺼운 것만 분리선으로 인정
+  if(cand.length >= 4 || railPeriod > 0){
+    const ws = cand.map(c=>c.width).sort((a,b)=>a-b);
+    const med = ws[ws.length>>1];
+    cand = cand.filter(c => c.width >= Math.max(med*1.5, med+2));
+  }
+  if(!cand.length) return [[], 0];
+
+  cand.sort((a,b) => (b.width*b.strength) - (a.width*a.strength));
+  cand = cand.slice(0,2).sort((a,b) => a.center - b.center);
+  return [cand.map(c=>c.center), Math.min(0.7, 0.40 + 0.10*cand.length)];
+}
+
+/* ── 3) 방충망 = 고주파 텍스처 + 양방향 주기성 ───────────── */
+function detectScreen(gFull, wF, hF, box, scale){
+  const x = Math.round(box[0]/scale), y = Math.round(box[1]/scale);
+  const bw = Math.round(box[2]/scale), bh = Math.round(box[3]/scale);
+  const cx0 = Math.max(0, x+Math.floor(bw*0.3)), cy0 = Math.max(0, y+Math.floor(bh*0.3));
+  const cx1 = Math.min(wF, x+Math.floor(bw*0.7)), cy1 = Math.min(hF, y+Math.floor(bh*0.7));
+  const cw = cx1-cx0, ch = cy1-cy0;
+  if(cw < 40 || ch < 40) return [false, 0, {}];
+
+  const crop = new Float32Array(cw*ch);
+  for(let j=0;j<ch;j++) for(let i=0;i<cw;i++) crop[j*cw+i] = gFull[(cy0+j)*wF + cx0+i];
+  const sm = blur(crop, cw, ch, 1);
+
+  const detail = new Float32Array(cw*ch);
+  let tex=0, mean=0;
+  for(let i=0;i<cw*ch;i++){ detail[i] = Math.abs(crop[i]-sm[i]); tex += detail[i]; mean += crop[i]; }
+  tex /= (cw*ch); mean /= (cw*ch);
+  let varSum=0; for(let i=0;i<cw*ch;i++){ const d=crop[i]-mean; varSum += d*d; }
+  const contrast = Math.sqrt(varSum/(cw*ch)) + 1e-6;
+
+  const colP = new Float64Array(cw), rowP = new Float64Array(ch);
+  for(let j=0;j<ch;j++) for(let i=0;i<cw;i++){ colP[i] += detail[j*cw+i]; rowP[j] += detail[j*cw+i]; }
+  for(let i=0;i<cw;i++) colP[i] /= ch;
+  for(let j=0;j<ch;j++) rowP[j] /= cw;
+
+  const [sx, px] = periodicity(colP, 2, 24);
+  const [sy, py] = periodicity(rowP, 2, 24);
+  const grid = Math.min(sx, sy);
+  const score = Math.min(1, Math.max(0, (tex/contrast)*1.2*0.5 + grid*0.5));
+  const detected = tex > 1.2 && grid > 0.30;
+  return [detected, +score.toFixed(3),
+    {texture:+tex.toFixed(3), grid_regularity:+grid.toFixed(3), period_px:[px, py]}];
+}
+
+/* ── 4) 창밖 난간 = 세로 에지의 규칙적 반복 ──────────────── */
+function detectRailing(g, w, h, box){
+  const [bx, by, bw, bh] = box;
+  if(bw < 40 || bh < 40) return [false, 0, {}];
+  const y0 = by+Math.floor(bh*0.15), y1 = by+Math.floor(bh*0.85);
+  const sm = blur(g, w, h, 2);
+  const prof = new Float64Array(bw);
+  for(let i=1;i<bw-1;i++){
+    let s=0, c=0;
+    for(let y=y0;y<y1;y++){
+      const p = y*w + bx+i;
+      s += Math.abs(sm[p+1]-sm[p-1]);   // Sobel x 근사
+      c++;
+    }
+    prof[i] = c ? s/c : 0;
+  }
+  const [score, period] = periodicity(prof, Math.max(3, Math.floor(bw*0.03)),
+                                            Math.max(6, Math.floor(bw*0.20)));
+  const bars = period ? Math.floor(bw/period) : 0;
+  return [score > 0.35 && bars >= 3, +score.toFixed(3), {period_px:period, approx_bars:bars}];
+}
+
+/* ── 5) 기준물체(A4/카드) → mm/px ────────────────────────── */
+function detectReference(g, w, h, keys, exclude){
+  const sm = blur(g, w, h, 2);
+  const thr = Math.max(otsu(sm), 110);
+  const mask = new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++) mask[i] = sm[i] > thr ? 1 : 0;
+
+  const imgArea = w*h;
+  const comps = components(mask, w, h, imgArea*0.002);
+  let best = null;
+
+  for(const c of comps){
+    const boxArea = c.w*c.h;
+    if(boxArea < imgArea*0.002 || boxArea > imgArea*0.08) continue;  // 기준물체는 작다
+    if(c.area/boxArea < 0.75) continue;                              // 꽉 찬 사각형
+    if(Math.min(c.w, c.h) < 8) continue;
+    // 창 개구부와 거의 같은 사각형이면 창을 오인한 것
+    if(exclude){
+      const [ex,ey,ew,eh] = exclude;
+      if(Math.abs(c.w-ew) < ew*0.25 && Math.abs(c.h-eh) < eh*0.25) continue;
+    }
+    // 밝고 균일한 면인가
+    let mean=0, n=0;
+    for(let y=c.y;y<c.y+c.h;y++) for(let x=c.x;x<c.x+c.w;x++){ mean += g[y*w+x]; n++; }
+    mean /= n;
+    let vs=0;
+    for(let y=c.y;y<c.y+c.h;y++) for(let x=c.x;x<c.x+c.w;x++){ const d=g[y*w+x]-mean; vs += d*d; }
+    const std = Math.sqrt(vs/n);
+    if(mean < 110 || std > 45) continue;
+
+    const longPx = Math.max(c.w, c.h), shortPx = Math.min(c.w, c.h);
+    const ratio = longPx/shortPx;
+    for(const key of keys){
+      const [longMm] = REFERENCES[key];
+      const target = REFERENCES[key][0]/REFERENCES[key][1];
+      const err = Math.abs(ratio-target)/target;
+      if(err > 0.07) continue;      // A4(1.414)·카드(1.586) 구분 위해 좁게
+      if(!best || err < best.err)
+        best = {err, mmPerPx: longMm/longPx, box:c, key,
+                conf: Math.min(0.8, Math.max(0.2, 0.8 - err*2.5))};
+    }
+  }
+  return best;
+}
+
+/* ── 오버레이 그리기 ─────────────────────────────────────── */
+function drawOverlay(canvas, box, mullions, refBox, screenOn, railOn){
+  const c = document.createElement('canvas');
+  c.width = canvas.width; c.height = canvas.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(canvas, 0, 0);
+  ctx.lineWidth = 3; ctx.font = 'bold 15px sans-serif';
+
+  const [x,y,w,h] = box;
+  ctx.strokeStyle = '#00e65a'; ctx.strokeRect(x, y, w, h);
+  ctx.fillStyle = '#00e65a'; ctx.fillText('window opening', x+5, Math.max(16, y-7));
+
+  ctx.strokeStyle = '#28a0ff';
+  for(const mx of mullions){ ctx.beginPath(); ctx.moveTo(mx,y); ctx.lineTo(mx,y+h); ctx.stroke(); }
+  if(mullions.length){
+    ctx.fillStyle = '#28a0ff';
+    ctx.fillText(`sash x${mullions.length}`, Math.min(...mullions)+6, y+h-10);
+  }
+  if(refBox){
+    ctx.strokeStyle = '#ffdc28'; ctx.strokeRect(refBox.x, refBox.y, refBox.w, refBox.h);
+    ctx.fillStyle = '#ffdc28'; ctx.fillText('scale ref', refBox.x, Math.max(14, refBox.y-6));
+  }
+  const tags = [];
+  if(screenOn) tags.push('screen detected');
+  if(railOn) tags.push('railing detected');
+  ctx.fillStyle = '#c878ff';
+  tags.forEach((t,i) => ctx.fillText(t, 10, 22+i*22));
+  return c.toDataURL('image/png');
+}
+
+/* ── EXIF 최소 파서 (초점거리 / 피사체거리) ──────────────── */
+function parseExifScale(buf, imgPxWidth){
+  try{
+    const dv = new DataView(buf);
+    if(dv.getUint16(0) !== 0xFFD8) return [null, {reason:"JPEG가 아닙니다."}];
+    let off = 2;
+    while(off < dv.byteLength){
+      if(dv.getUint16(off) !== 0xFFE1){
+        const len = dv.getUint16(off+2); off += 2+len;
+        if(dv.getUint16(off) === 0xFFDA) break;
+        continue;
+      }
+      const base = off+10;                       // "Exif\0\0" 다음 TIFF 헤더
+      const le = dv.getUint16(base) === 0x4949;
+      const g16 = o => dv.getUint16(o, le), g32 = o => dv.getUint32(o, le);
+      const readIFD = (ifdOff, want) => {
+        const found = {};
+        const n = g16(base+ifdOff);
+        for(let i=0;i<n;i++){
+          const e = base+ifdOff+2+i*12;
+          const tag = g16(e), type = g16(e+2), cnt = g32(e+4);
+          let val = null;
+          if(type === 5 && cnt >= 1){            // rational
+            const p = base + g32(e+8);
+            val = g32(p) / (g32(p+4) || 1);
+          } else if(type === 3) val = g16(e+8);
+          else if(type === 4) val = g32(e+8);
+          if(want.includes(tag)) found[tag] = val;
+        }
+        return found;
+      };
+      const ifd0 = readIFD(g32(base+4), [0x8769]);
+      const exifOff = ifd0[0x8769];
+      if(!exifOff) return [null, {reason:"EXIF 상세 정보가 없습니다."}];
+      const ex = readIFD(exifOff, [0xA405, 0x9206]);   // FocalLengthIn35mm, SubjectDistance
+      const f35 = ex[0xA405], dist = ex[0x9206];
+      if(!f35)  return [null, {reason:"EXIF에 35mm 환산 초점거리가 없습니다."}];
+      if(!dist) return [null, {reason:"EXIF에 피사체 거리가 없습니다(대부분 기종이 기록하지 않음)."}];
+      if(f35 <= 1 || f35 >= 500 || dist < 0.1 || dist > 20)
+        return [null, {reason:"EXIF 값이 유효 범위를 벗어났습니다."}];
+      return [(dist*1000*36/f35)/imgPxWidth, {f35_mm:f35, distance_m:dist}];
+    }
+    return [null, {reason:"EXIF 정보가 없습니다."}];
+  }catch(e){ return [null, {reason:"EXIF 해석 실패"}]; }
+}
+
+/* ── 메인 엔트리 ─────────────────────────────────────────── */
+async function analyzePhoto(file, reference){
+  const buf = await file.arrayBuffer();
+  const img = await new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = () => rej(new Error("이미지를 읽을 수 없습니다."));
+    im.src = URL.createObjectURL(file);
+  });
+
+  const small = drawToCanvas(img, MAX_W);
+  const {g, w, h} = toGray(small.ctx.getImageData(0,0,small.w,small.h));
+  const full = drawToCanvas(img, FULL_W);
+  const fullGray = toGray(full.ctx.getImageData(0,0,full.w,full.h));
+
+  const evidence = [];
+  const [box, boxConf, method] = detectOpening(g, w, h);
+  const [railOn, railScore, railMeta] = detectRailing(g, w, h, box);
+  const [mullions, mullionConf] = detectMullions(g, w, h, box, railOn ? railMeta.period_px : 0);
+
+  // 창 종류 추론
+  let wtype = "unknown", wconf = 0.25;
+  evidence.push(`창 개구부를 검출했습니다 (신뢰도 ${Math.round(boxConf*100)}%, 방식: ${method}).`);
+  if(mullions.length){
+    const centered = mullions.some(mx => Math.abs((mx-box[0])/box[2] - 0.5) < 0.22);
+    wtype = "slide";
+    wconf = Math.min(0.7, mullionConf + (centered ? 0.1 : 0));
+    evidence.push(`개구부를 세로로 가로지르는 분리선 ${mullions.length}개를 검출했습니다` +
+      (centered ? " (중앙부 위치 → 2짝 미닫이창의 전형적 형태)" : ""));
+  } else {
+    evidence.push("개구부 내부에 세로 분리선이 보이지 않습니다 (1짝 통유리 → 여닫이·붙박이창일 수 있음)");
+  }
+
+  const [screenOn, screenScore, screenMeta] =
+    detectScreen(fullGray.g, fullGray.w, fullGray.h, box, small.scale/full.scale);
+  if(screenOn) evidence.push(`촘촘한 규칙 격자가 감지되어 방충망으로 추정합니다.`);
+  if(railOn) evidence.push(`창밖에 약 ${railMeta.approx_bars}개의 규칙적 세로 막대가 감지되어 난간으로 추정합니다.`);
+
+  const ratio = box[2] ? +(box[3]/box[2]).toFixed(4) : null;
+  if(ratio) evidence.push(`개구부 비율을 측정했습니다 — 높이 ÷ 폭 = ${ratio.toFixed(2)} (정면에서 찍은 사진일 때 정확합니다).`);
+
+  // 축척 — ① 기준물체 ② EXIF
+  let estW=null, estH=null, scaleConf=0, scaleSource=null, refBox=null;
+  const keys = (!reference || reference==="auto") ? ["a4","card"]
+             : (reference==="none" ? [] : [reference]);
+  if(keys.length){
+    const hit = detectReference(g, w, h, keys, box);
+    if(hit){
+      estW = Math.round(box[2]*hit.mmPerPx);
+      estH = Math.round(box[3]*hit.mmPerPx);
+      scaleConf = hit.conf; scaleSource = "reference"; refBox = hit.box;
+      evidence.push(`기준물체(${hit.key==="a4"?"A4 용지":"카드"})를 자동으로 찾아 ` +
+        `1px ≈ ${hit.mmPerPx.toFixed(2)}mm로 환산 → 개구부 약 ${estW}×${estH}mm로 추정합니다.`);
+    }
+  }
+  if(estW == null){
+    const [mmPerPx, info] = parseExifScale(buf, img.width);
+    if(mmPerPx){
+      estW = Math.round(box[2]/small.scale*mmPerPx);
+      estH = Math.round(box[3]/small.scale*mmPerPx);
+      scaleConf = 0.3; scaleSource = "exif";
+      evidence.push(`사진 메타데이터(초점거리 ${Math.round(info.f35_mm)}mm, 촬영거리 ` +
+        `${info.distance_m.toFixed(1)}m)로 치수를 추정했습니다 → 약 ${estW}×${estH}mm. 오차가 클 수 있습니다.`);
+    } else {
+      evidence.push("사진만으로는 실제 치수(mm)를 확정할 수 없습니다 (사진에는 축척 정보가 없습니다). " +
+        "창문 높이만 골라주시면 판정됩니다.");
+    }
+  }
+
+  return {
+    ok:true, window_type:wtype, window_type_confidence:+wconf.toFixed(3), evidence,
+    opening:{x:box[0], y:box[1], w:box[2], h:box[3], confidence:+boxConf.toFixed(3), method},
+    mullion_count:mullions.length, ratio_hw:ratio,
+    est_width_mm:estW, est_height_mm:estH,
+    scale_confidence:+scaleConf.toFixed(3), scale_source:scaleSource,
+    has_screen:screenOn, screen_score:screenScore, screen_meta:screenMeta,
+    has_rail:railOn, rail_score:railScore, rail_meta:railMeta,
+    overlay: drawOverlay(small.canvas, box, mullions, refBox, screenOn, railOn),
+  };
+}
+
+
+/* ── 정적판 전용 브리지 ─────────────────────────────────────
+   서버가 없으므로 사진 분석 결과를 전역에 보관했다가 판정에 재사용한다. */
+let lastVision = null;
+
+function collectInput(){
+  const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? null : v; };
+  return {
+    windowType:   $('window_type').value,
+    widthMm:      num('width_mm'),
+    heightMm:     num('height_mm'),
+    heightBucket: $('height_bucket').value,
+    hasScreen:    $('has_screen').checked,
+    hasRail:      $('has_rail').checked,
+    doubleWindow: $('double_window').checked,
+    hasOutlet:    $('has_outlet').checked,
+  };
+}
+
+/* ===== UI ===== */
+
+const $ = id => document.getElementById(id);
+let fileBlob = null;
+let ratioHW = null;   // 사진에서 측정한 높이÷폭 (축척과 무관하게 정확)
+
+// ── 업로드 ──
+const drop = $('drop'), fileInput = $('file');
+drop.onclick = () => fileInput.click();
+fileInput.onchange = e => setFile(e.target.files[0]);
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.add('drag')}));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.remove('drag')}));
+drop.addEventListener('drop', e => { if(e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
+
+function setFile(f){
+  if(!f || !f.type.startsWith('image/')) return;
+  fileBlob = f;
+  const rd = new FileReader();
+  rd.onload = e => $('dropText').innerHTML =
+    `<img src="${e.target.result}"><div style="margin-top:7px">${f.name} — 다시 선택하려면 클릭</div>`;
+  rd.readAsDataURL(f);
+  runVision();
+}
+$('reference').onchange = () => { if(fileBlob) runVision(); };
+
+// ── 사진 분석 (업로드 직후) ──
+async function runVision(){
+  if(!fileBlob){ lastVision = null; return; }
+  $('visionBox').style.display = 'block';
+  $('evidence').innerHTML = '<li><span class="spin" style="border-color:var(--accent);border-top-color:transparent"></span>창틀을 검출하는 중...</li>';
+  $('overlay').style.display = 'none';
+
+  try{
+    const v = await analyzePhoto(fileBlob, $('reference').value);
+    if(!v.ok){
+      $('evidence').innerHTML = `<li style="color:var(--warn)">사진 분석 실패: ${v.error||'알 수 없는 오류'}</li>`;
+      return;
+    }
+    if(v.overlay){ $('overlay').src = v.overlay; $('overlay').style.display = 'block'; }
+    $('evidence').innerHTML = (v.evidence||[]).map(x=>`<li>${x}</li>`).join('');
+
+    let filled = false;
+    if(v.window_type !== 'unknown' && v.window_type_confidence >= 0.5){
+      $('window_type').value = v.window_type; filled = true;
+    }
+    if(v.est_width_mm){ $('width_mm').value = v.est_width_mm; filled = true; }
+    if(v.est_height_mm){ $('height_mm').value = v.est_height_mm; filled = true; }
+    if(v.has_screen){ $('has_screen').checked = true; filled = true; }
+    if(v.has_rail){ $('has_rail').checked = true; filled = true; }
+    $('autoTag').style.display = filled ? 'inline-block' : 'none';
+
+    lastVision = v;
+    ratioHW = v.ratio_hw || null;
+    updateRatioHint();
+  }catch(e){
+    $('evidence').innerHTML = `<li style="color:var(--warn)">사진 분석 중 오류: ${e}</li>`;
+  }
+}
+
+// 한쪽만 입력해도 나머지를 비율로 즉시 계산해 보여준다
+function updateRatioHint(){
+  const box = $('ratioBox');
+  if(!ratioHW){ box.style.display='none'; return; }
+  const w = parseFloat($('width_mm').value), h = parseFloat($('height_mm').value);
+  box.style.display = 'block';
+  if(w && !h)      box.innerHTML = `📐 비율 ${ratioHW.toFixed(2)} 적용 → <b>세로 약 ${Math.round(w*ratioHW)}mm</b>로 판정`;
+  else if(h && !w) box.innerHTML = `📐 비율 ${ratioHW.toFixed(2)} 적용 → <b>가로 약 ${Math.round(h/ratioHW)}mm</b>로 판정`;
+  else if(w && h){
+    const d = Math.abs((h/w) - ratioHW) / ratioHW;
+    box.innerHTML = d > 0.25
+      ? `⚠️ 입력 비율(${(h/w).toFixed(2)})이 사진 비율(${ratioHW.toFixed(2)})과 크게 다릅니다.`
+      : `✓ 입력 치수가 사진 비율과 일치합니다.`;
+  } else box.innerHTML = `📐 사진 비율 ${ratioHW.toFixed(2)} — <b>하나만</b> 입력해도 나머지를 계산합니다.`;
+}
+['width_mm','height_mm'].forEach(id => { $(id).oninput = updateRatioHint; });
+
+// ── 판정 요청 ──
+$('go').onclick = async () => {
+  const btn = $('go');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>분석 중...';
+  try{
+    render(judge(collectInput(), lastVision));
+  }catch(e){
+    $('placeholder').style.display='none';
+    $('result').style.display='block';
+    $('result').innerHTML = `<div class="hero v-no"><div class="top"><div class="ico">⚠️</div>
+      <div><div class="vt">오류</div><div class="vs">${e}</div></div></div></div>`;
+  }
+  btn.disabled = false; btn.textContent = '설치 가능 여부 판단하기';
+};
+
+const VMAP = {
+  '가능':            {icon:'✅', cls:'v-ok'},
+  '기사 방문 시 가능': {icon:'🔧', cls:'v-tech'},
+  '불가':            {icon:'❌', cls:'v-no'},
+  '정보 부족':        {icon:'ℹ️', cls:'v-info'},
+};
+const SRC_TXT = {reference:'사진에서 실측', photo:'사진에서 실측', exif:'사진 메타데이터',
+  ratio:'사진 비율로 계산', user:'직접 입력', bucket:'직접 고른 높이'};
+
+// 창문 높이 선택 버튼 (파세코 키트 경계에 맞춤)
+const H_BTNS = [
+  ['under77', '77cm 미만',  '설치 불가'],
+  ['77_92',   '77~92cm',    '미니만 가능'],
+  ['92_132',  '92~132cm',   '작은 방 창문'],
+  ['132_148', '132~148cm',  '일반 방 창문'],
+  ['148_188', '148~188cm',  '큰 창 · +56cm 키트'],
+  ['188_230', '188~230cm',  '베란다 창 · +98cm 키트'],
+  ['230_246', '230~246cm',  '듀얼/프리미엄만'],
+  ['over246', '246cm 이상', '특수연장 · 기사 방문'],
+];
+
+// 사진이 실제로 알아낸 것들을 목록으로 (업로드의 성과를 항상 보여준다)
+function visionFindings(vi){
+  if(!vi || !vi.ok) return [];
+  const f = [];
+  if(vi.window_type === 'slide')
+    f.push('<b>미닫이(슬라이딩)창</b> — 창문형 에어컨을 설치할 수 있는 창 종류입니다');
+  if(vi.mullion_count > 0)
+    f.push(`창짝 분리선 ${vi.mullion_count}개 검출 → <b>${vi.mullion_count+1}짝 구조</b>`);
+  if(vi.ratio_hw)
+    f.push(`창 비율 측정 — 세로 ÷ 가로 = <b>${vi.ratio_hw.toFixed(2)}</b>`);
+  if(vi.has_screen) f.push('방충망 감지 — 설치 시 해당 구간 탈거 필요');
+  if(vi.has_rail)   f.push('창밖 난간 감지 — 실외 토출부 간섭 확인 필요');
+  if(vi.est_width_mm)
+    f.push(`기준물체로 실측 — 약 <b>${vi.est_width_mm}×${vi.est_height_mm}mm</b>`);
+  return f;
+}
+
+// ── 결과 렌더 ──
+function render(r){
+  const v = VMAP[r.verdict] || VMAP['정보 부족'];
+  const vi = r.vision || {};
+  const findings = visionFindings(vi);
+  // 높이만 남은 상태는 '실패'가 아니라 '분석 완료, 한 단계 남음'이다.
+  const pending = r.needs === 'height';
+
+  let sub = `창 종류: ${r.window_type_label}`;
+  if(r.install_mode) sub += ` · ${r.install_mode}`;
+
+  let html;
+  if(pending){
+    html = `<div class="hero v-info2"><div class="top">
+      <div class="ico">🔍</div>
+      <div><div class="vt">사진 분석 완료</div>
+      <div class="vs">${r.window_type_label}${vi.mullion_count>0?` · ${vi.mullion_count+1}짝 구조`:''}
+        — 판정까지 <b style="color:var(--accent)">한 단계</b> 남았습니다</div></div></div></div>`;
+  } else {
+    html = `<div class="hero ${v.cls}"><div class="top">
+      <div class="ico">${v.icon}</div>
+      <div><div class="vt">${r.verdict}</div><div class="vs">${sub}</div></div></div></div>`;
+  }
+
+  // ① 사진이 알아낸 것 — 항상 상단에 노출 (업로드가 헛되지 않았음을 보여준다)
+  if(findings.length){
+    html += `<div class="sec found"><h3>📷 사진에서 확인된 것</h3>
+      <ul>${findings.map(f=>`<li>${f}</li>`).join('')}</ul></div>`;
+  }
+
+  // ② 크기 팩트체크 — 추정/실측 크기를 먼저 제시하고 확인받는다.
+  //    아니라고 하면 그때 높이 선택지를 편다.
+  const sc = r.size_check;
+  if(sc){
+    const dim = sc.width_cm
+      ? `가로 약 ${sc.width_cm}cm × 세로 약 ${sc.height_cm}cm`
+      : `세로 약 ${sc.height_cm}cm`;
+    const basis = sc.measured
+      ? `사진 속 기준물체로 <b>실제 측정</b>한 값입니다. 검출이 어긋났을 수 있으니 확인해 주세요.`
+      : `사진에는 실제 크기 정보가 없어, 검출한 비율${sc.ratio?`(${sc.ratio.toFixed(2)})`:''}과
+         <b>가장 흔한 방 창문 크기</b>를 바탕으로 잡은 출발점입니다. 정확하지 않을 수 있습니다.`;
+    // 이미 판정이 나온 경우(실측)에는 '맞아요'가 판정을 다시 낼 필요가 없다
+    const yesLabel = pending ? '맞아요 · 이대로 판정' : '맞아요';
+
+    html += `<div class="ask" id="sizeCheck">
+      <div class="askq">이 창문 크기가 맞나요?</div>
+      <div class="guessval">${dim}</div>
+      <div class="note" style="margin-top:7px">${basis}<br>
+        측정 기준: ${r.height_basis||''} — 유리 부분만 재면 안 됩니다.</div>
+      <div class="confirm">
+        <button type="button" class="cbtn yes" data-h="${sc.bucket||''}"
+          data-mm="${sc.measured?sc.height_mm:''}" data-pending="${pending?1:0}">${yesLabel}</button>
+        <button type="button" class="cbtn no" id="pickOther">아니요 · 직접 고를게요</button>
+      </div>
+      <div id="hpick" style="display:none">
+        <div class="note" style="margin:13px 0 8px">실제 창문 높이를 골라주세요</div>
+        <div class="askb">${H_BTNS.map(([k,t,d]) =>
+          `<button type="button" class="hb" data-h="${k}">${t}
+            <br><span style="font-weight:400;font-size:11.5px;color:var(--muted)">${d}</span>
+          </button>`).join('')}</div>
+      </div></div>`;
+  }
+
+  // ② 창문 크기 (높이를 알고 있을 때만)
+  const se = r.size_estimate;
+  if(se){
+    html += `<div class="sizebox">
+      <div class="sizehead">📐 판정에 사용한 창문 크기</div>
+      <div class="sizeval">${se.text}</div>
+      <div class="sizesrc">근거: ${SRC_TXT[se.source]||'추정'}</div>
+      ${se.width_ref_text ? `<div class="sizesrc">${se.width_ref_text}</div>` : ''}
+      <div class="sizeask">크기가 다르면
+        <button type="button" id="fixSize" class="lnk">직접 입력하기</button></div></div>`;
+  }
+
+  // ③ 필요한 설치키트
+  if(r.kit_info && r.kit_info.length){
+    html += `<div class="sec"><h3>🔧 필요한 설치키트</h3>`;
+    r.kit_info.forEach(k => {
+      const ex = k.extra_cm > 0;
+      html += `<div class="kit ${ex?'need':''}">
+        <b>${k.size_class_label.split(' (')[0]}</b> →
+        <b style="color:${ex?'var(--warn)':'var(--ok)'}">${k.kit_label}</b>
+        ${k.technician_only?'<span class="tag warn">기사 방문 필요</span>':''}
+        <div class="meta">대응 ${k.range_cm}${ex?' · 본체와 별도 구매 필요':' · 추가 구매 불필요'}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // ④ 추천 · 주의 (중요하므로 펼친 상태)
+  html += section('💡 추천', r.recommendations);
+  html += section('⚠️ 주의사항', r.cautions);
+
+  // ⑤ 설치 가능 모델 — 최신 모델만 펼치고 구형은 접음
+  if(r.fit_products && r.fit_products.length){
+    const cur = r.fit_products.filter(p=>p.current), old = r.fit_products.filter(p=>!p.current);
+    html += `<div class="sec"><h3>설치 가능 모델 (${r.fit_products.length}종)</h3>`;
+    cur.forEach(p => html += prodCard(p, true));
+    if(old.length){
+      html += `<details><summary>이전 세대 모델 ${old.length}종 보기</summary>`;
+      old.forEach(p => html += prodCard(p, false));
+      html += `</details>`;
+    }
+    html += `</div>`;
+  }
+
+  // ⑥ 근거·규격표는 접어서 시야를 정리
+  html += `<details><summary>판단 근거 자세히 보기</summary>`;
+  html += section('', r.reasons);
+  if(r.requirements){
+    const u = r.used || {};
+    html += `<div class="sec"><h3>파세코 공식 설치 규격</h3><div class="tblwrap">
+      <table class="req"><tr><th>설치 방식</th><th>최소 가로 폭</th>
+      <th>미니 최소 높이</th><th>듀얼/프리미엄 최소 높이</th></tr>`;
+    r.requirements.forEach(q => {
+      html += `<tr><td>${q.label}</td>${cell(q.min_width_mm,u.width_mm)}
+        ${cell(q.mini_min_height_mm,u.height_mm)}
+        ${cell(q.standard_min_height_mm,u.height_mm)}</tr>`;
+    });
+    html += `</table></div></div>`;
+  }
+  html += `</details>`;
+
+  html += `<div class="note" style="margin-top:12px">※ 파세코 공식 설치 기준을 적용했습니다.
+    창틀 재질·구조에 따라 예외가 있을 수 있어 최종 확인은 대리점에 문의하세요.</div>`;
+
+  $('placeholder').style.display = 'none';
+  const el = $('result');
+  el.style.display = 'block';
+  el.innerHTML = html;
+
+  // 높이 버튼 → 즉시 재판정
+  // 사진 실측으로 채워진 mm 값이 남아 있으면 구간 선택이 무시되므로 먼저 비운다
+  el.querySelectorAll('button.hb').forEach(b => {
+    b.onclick = () => {
+      $('height_mm').value = '';
+      $('width_mm').value = '';
+      $('height_bucket').value = b.dataset.h;
+      $('go').click();
+    };
+  });
+  // "맞아요" → 판정 전이면 그 값으로 판정, 이미 판정났으면 확인 블록만 닫는다
+  const yes = el.querySelector('button.cbtn.yes');
+  if(yes) yes.onclick = () => {
+    if(yes.dataset.pending !== '1'){
+      $('sizeCheck').remove();     // 이미 이 크기로 판정된 상태 → 확인만 하고 닫기
+      return;
+    }
+    if(yes.dataset.mm) $('height_mm').value = yes.dataset.mm;
+    else if(yes.dataset.h) $('height_bucket').value = yes.dataset.h;
+    $('go').click();
+  };
+  // "아니요" → 높이 선택지를 펼친다
+  const no = $('pickOther');
+  if(no) no.onclick = () => {
+    $('hpick').style.display = 'block';
+    no.style.display = 'none';
+    $('hpick').scrollIntoView({behavior:'smooth', block:'nearest'});
+  };
+  // '직접 입력하기' → 정확 치수 입력란 열고 포커스
+  const fx = $('fixSize');
+  if(fx) fx.onclick = () => {
+    $('exactBox').open = true;
+    $('width_mm').scrollIntoView({behavior:'smooth', block:'center'});
+    $('width_mm').focus();
+  };
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function section(title, items){
+  if(!items || !items.length) return '';
+  const fmt = s => String(s).replace(/\*\*(.+?)\*\*/g,'<b style="color:var(--accent)">$1</b>');
+  return `<div class="sec">${title?`<h3>${title}</h3>`:''}
+    <ul>${items.map(x=>`<li>${fmt(x)}</li>`).join('')}</ul></div>`;
+}
+
+function prodCard(p, current){
+  const tag = p.size_class === 'mini'
+    ? '<span class="tag mini">미니</span>' : '<span class="tag">듀얼/프리미엄</span>';
+  const era = p.gen.includes(String(p.year)) ? p.gen : `${p.year}년 · ${p.gen}`;
+
+  // 값이 있는 스펙만 표시 (없는 수치를 지어내지 않음)
+  const spec = [];
+  if(p.compressor)  spec.push(['컴프레서', p.compressor]);
+  if(p.cooling_kw)  spec.push(['냉방능력', p.cooling_kw+'kW']);
+  if(p.area_pyeong) spec.push(['냉방면적', '약 '+p.area_pyeong+'평']);
+  if(p.power_w)     spec.push(['소비전력', p.power_w+'W']);
+  if(p.noise_db)    spec.push(['소음', p.noise_db+'dB']);
+  if(p.install_height_range) spec.push(['설치 가능 창문높이', p.install_height_range]);
+  if(p.required_kit) spec.push(['이 창에 필요한 키트',
+    (p.required_kit_extra_cm>0?'⚠️ ':'')+p.required_kit]);
+
+  const fx = (p.highlights||[]).map(h=>`<span class="fx">${h}</span>`).join('');
+  return `<div class="prod ${current?'cur':''}">
+    <div><span class="pname">${p.name}</span><span class="pmodel">${p.model}</span>${tag}</div>
+    <div class="meta">${era} — ${p.features}</div>
+    ${fx?`<div class="fxs">${fx}</div>`:''}
+    ${spec.length?`<table class="spec">${spec.map(([k,val])=>
+      `<tr><th>${k}</th><td>${val}</td></tr>`).join('')}</table>`:''}
+    ${p.url?`<a class="buy" href="${p.url}" target="_blank" rel="noopener noreferrer">
+      네이버 스토어에서 보기 →</a>`:''}
+  </div>`;
+}
+
+// 규격표 셀: 내 창 치수가 기준을 충족하면 초록, 미달이면 빨강
+function cell(need, mine){
+  if(!mine) return `<td>${need}mm</td>`;
+  return `<td class="${mine>=need?'y':'n'}">${need}mm ${mine>=need?'✓':'✗'}</td>`;
+}
+</script>
+</body>
+</html>
